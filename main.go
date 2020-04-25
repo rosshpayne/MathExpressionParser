@@ -5,7 +5,7 @@ import (
 	"github.com/satori/go.uuid"
 )
 
-type literalT int16
+type literalT uint8
 
 const (
 	num_ literalT = iota
@@ -13,7 +13,7 @@ const (
 	bl
 )
 
-type funcT int16
+type funcT uint8
 
 const (
 	eq funcT = iota
