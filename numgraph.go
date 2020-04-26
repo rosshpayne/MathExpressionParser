@@ -154,23 +154,21 @@ func numGraph(input string) *expression {
 					// create node (expression) and attach to graph in preparation for future extendRight node(s).
 					//
 					if extendRight {
-						fmt.Println(" extendRight ============= HIGHER PRECEDENCE numL\n", numL)
 						en = makeExpr(lvl, numL, opr, nil)
 						if e == nil {
-							fmt.Println("++ e is nil so make e=en")
 							e, en = en, nil
 						} else {
 							e, lvl = e.ExtendRight(en, lvl)
 							extendRight = false
 						}
-					} else if numL == nil { // TODO - can remove this condition - check
+
+					} else if numL == nil {
 						// add operator only node to graph - no left, right operands. AddParent will attach left, and future ExtendRIght will attach right.
 						en = makeExpr(lvl, nil, opr, nil)
 						e = e.AddParent(en)
-						fmt.Printf("HIGHER PRECEDENCE numL\n")
+
 					} else {
 						// make expr for existing numL and opr
-						fmt.Printf("HIGHER PRECEDENCE mkExpr using previous numL = %s and current opr %c and AddParent\n", numL.printName(), opr)
 						en = makeExpr(lvl, numL, opr, nil)
 						if e == nil {
 							e, en = en, nil
@@ -179,11 +177,7 @@ func numGraph(input string) *expression {
 						}
 
 					}
-					// increment precedence level which is applied to all expressions until a lower precedence is detected ie. +,-,).
-					//lvl--
-					// Set ihp (implicit higher precedence) on. Next )-+ will set it off.
 					fmt.Println("HIGHER PRECEDENCE ....  ", i, lvl)
-					//ihpSet = true
 					// all higher precedence operations, ihp or explicit (), perform an "extendRight" to create a separate path in the graph.
 					extendRight = true
 					ihpSet = true
