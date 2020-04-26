@@ -168,7 +168,7 @@ func makeExpr(d depthT, l operand, op operator, r operand) *expression {
 
 // ExtendRight for Higher Precedence operators or open braces - parsed:   *,/, (
 // c - current op node, n is the higer order op we want to extend right
-func (c *expression) ExtendRight(n *expression, lvl depthT) (*expression, depthT) {
+func (c *expression) extendRight(n *expression, lvl depthT) (*expression, depthT) {
 
 	c.right = n
 	//n.depth = lvl + 1
@@ -180,7 +180,7 @@ func (c *expression) ExtendRight(n *expression, lvl depthT) (*expression, depthT
 
 // addParent - add expression (argument), to expression (method receiver) as a parent, if it is at a suitable level in the precedence hierarchy.
 // Otherwise recursively walk the graph upwards until we get to an expression with the correct precedence level.
-func (c *expression) AddParent(n *expression) *expression {
+func (c *expression) addParent(n *expression) *expression {
 	//
 	// based on depth (precedence level) of expression n and c, walk up the tree to find a suitable expression to append n to.
 	//
@@ -188,8 +188,8 @@ func (c *expression) AddParent(n *expression) *expression {
 	if ediff > 0 {
 		// move to next paranthesis level, noting that the expression may have no parent.
 		if c.parent != nil {
-			fmt.Println("AddParent ===== lvl ", c.depth, n.depth)
-			return c.parent.AddParent(n)
+			fmt.Println("addParent ===== lvl ", c.depth, n.depth)
+			return c.parent.addParent(n)
 		}
 	}
 	//
@@ -204,7 +204,7 @@ func (c *expression) AddParent(n *expression) *expression {
 	// set old parent to new node
 	c.parent = n
 	n.left = c
-	fmt.Printf("AddParent.....new parent %c-%d on %c-%d\n", n.opr, n.depth, c.opr, c.depth)
+	fmt.Printf("addParent.....new parent %c-%d on %c-%d\n", n.opr, n.depth, c.opr, c.depth)
 
 	return n
 }
