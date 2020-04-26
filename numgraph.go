@@ -9,7 +9,7 @@ import (
 	"github.com/DynamoGraph/token"
 )
 
-func numGraph(input string) *expression {
+func buildExprGraph(input string) *expression {
 
 	var (
 		tok         *token.Token
@@ -144,14 +144,10 @@ func numGraph(input string) *expression {
 			fmt.Printf("********* in INT %d : opr = [%c]. lvl = %d\n", i, opr, lvl)
 			if opr == '+' || opr == '-' {
 				//
-				// check if next opr has higher precedence. If so unary expression with previous numL (not current INT) and append to existing lvl.
-				//  Next operation with the higher precedence will extendRight from current node.
-				//  Set OperandL = true to start the creation an expression with numL * numR
-				//
 				tok := p.CurToken // which is really a peekToken because we do a NextToken after setting tok in top of for loop
 				if tok.Type == token.MULTIPLY || tok.Type == token.DIVIDE {
 					//
-					// create node (expression) and attach to graph in preparation for future extendRight node(s).
+					// High precedence operaton - create node (expression) and attach to graph in preparation for future extendRight node(s).
 					//
 					if extendRight {
 						en = makeExpr(lvl, numL, opr, nil)

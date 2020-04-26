@@ -69,7 +69,7 @@ func TestNumX(t *testing.T) {
 	}
 	for _, v := range tests {
 		t.Log(v.input)
-		root := numGraph(v.input)
+		root := buildExprGraph(v.input)
 		walk(root)
 		if int(root.getResult()*10000) == int(v.result*10000) {
 			t.Log("*** PASSED - ", v.result)
@@ -137,7 +137,7 @@ func TestNumAll(t *testing.T) {
 	}
 	for _, v := range tests {
 		t.Log(v.input)
-		root := numGraph(v.input)
+		root := buildExprGraph(v.input)
 		walk(root)
 		if int(root.getResult()*10000) == int(v.result*10000) {
 			t.Log("*** PASSED - ", v.result)
