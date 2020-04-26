@@ -145,7 +145,7 @@ func (e *expression) getResult() float64 {
 	return e.result
 }
 
-func makeExpr(d depthT, l operand, op operator, r operand) *expression {
+func makeExpr(d depthT, l operand, op operator, r operand) (*expression, operator) {
 
 	e := &expression{depth: d, left: l, opr: op, right: r}
 	fmt.Printf("MakeExpr depth  %d opr %c  %v %v %v %v\n", e.depth, op, e.left, e.right, l, r)
@@ -163,7 +163,7 @@ func makeExpr(d depthT, l operand, op operator, r operand) *expression {
 			x.parent = e
 		}
 	}
-	return e
+	return e, 0
 }
 
 // ExtendRight for Higher Precedence operators or open braces - parsed:   *,/, (

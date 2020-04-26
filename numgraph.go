@@ -34,7 +34,7 @@ func buildExprGraph(input string) *expression {
 	p := parser.New(l)
 	operandL = true
 
-	// TODO - initial single parse to validate parenthesis match
+	// TODO - initial full parse to validate left and right parenthesis match
 
 	for {
 
@@ -66,13 +66,12 @@ func buildExprGraph(input string) *expression {
 			//
 			if opr != 0 {
 				// parser is not at the beginning of the stmt e.g (5*3+...
-				// "(" has interrupted numL
 				if numL == nil {
 
 					fmt.Println("IN LPAREN: numL nil make operator only expression and append to current expression")
 					//  operands have been consumed into current expression. Take opr and make it parent of the expression.
 					//  The next operands and operator to be parsed will be extended to right of this operator only expression.
-					en = makeExpr(lvl-1, nil, opr, nil)
+					en, opr = makeExpr(lvl-1, nil, opr, nil)
 					e = e.addParent(en)
 
 				} else {
@@ -80,7 +79,7 @@ func buildExprGraph(input string) *expression {
 					// numL has yet to be consumed in expr, this means we have an active * or / operator
 					// "(" has interrupted current  operation, so must complete existing extendRight
 					fmt.Println("IN LPAREN: numL not nil make numL only expression ")
-					en = makeExpr(lvl-1, numL, opr, nil)
+					en, opr = makeExpr(lvl-1, numL, opr, nil)
 
 					if e == nil {
 						fmt.Println("IN LPAREN: set expr as first time ")
@@ -94,7 +93,6 @@ func buildExprGraph(input string) *expression {
 				operandL = true
 				extendRight = true
 				numL, numR = nil, nil
-				opr = 0
 
 			}
 
@@ -139,7 +137,7 @@ func buildExprGraph(input string) *expression {
 					// High precedence operaton - create node (expression) and attach to graph in preparation for future extendRight node(s).
 					//
 					if extendRight {
-						en = makeExpr(lvl, numL, opr, nil)
+						en, opr = makeExpr(lvl, numL, opr, nil)
 						if e == nil {
 							e, en = en, nil
 						} else {
@@ -149,18 +147,17 @@ func buildExprGraph(input string) *expression {
 
 					} else if numL == nil {
 						// add operator only node to graph - no left, right operands. addParent will attach left, and future ExtendRIght will attach right.
-						en = makeExpr(lvl, nil, opr, nil)
+						en, opr = makeExpr(lvl, nil, opr, nil)
 						e = e.addParent(en)
 
 					} else {
 						// make expr for existing numL and opr
-						en = makeExpr(lvl, numL, opr, nil)
+						en, opr = makeExpr(lvl, numL, opr, nil)
 						if e == nil {
 							e, en = en, nil
 						} else {
 							e = e.addParent(en)
 						}
-
 					}
 					fmt.Println("HIGHER PRECEDENCE ....  ", i, lvl)
 					// all higher precedence operations or explicit (), perform an "extendRight" to create a new branch in the graph.
@@ -180,13 +177,12 @@ func buildExprGraph(input string) *expression {
 
 				numR = &num{i: i}
 				fmt.Println("Right NUM ", i, "  lvl: ", lvl)
-				en := makeExpr(lvl, numL, opr, numR)
+				en, opr = makeExpr(lvl, numL, opr, numR)
 				if e == nil {
 					e, en = en, nil
 				}
 				// consumed following values, so reset them
 				numL, numR = nil, nil
-				opr = 0
 				// addParent is the default operation to extend the graph, which requires a numR only
 				operandL = false
 				// do not extend or add expression until we have an "e" and "en" expression.
