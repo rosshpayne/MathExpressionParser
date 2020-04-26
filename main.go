@@ -150,17 +150,18 @@ func makeExpr(d depthT, l operand, op operator, r operand) *expression {
 	e := &expression{depth: d, left: l, opr: op, right: r}
 	fmt.Printf("MakeExpr depth  %d opr %c  %s \n", e.depth, op, e.printName())
 
-	// remember: nil interfaces means the type component is nil not necessarily the value component.
-	// if a nil numL is passed to makeExpr, the type component is set (operand) but the value (concrete type) is nil.
-	// so to check the interface is nil you must check the value is also nil, as below.
-	if x, ok := e.left.(*num); ok {
-		if x != nil {
-			x.parent = e
+	if l != nil {
+		if x, ok := e.left.(*num); ok {
+			if x != nil {
+				x.parent = e
+			}
 		}
 	}
-	if x, ok := e.right.(*num); ok {
-		if x != nil {
-			x.parent = e
+	if r != nil {
+		if x, ok := e.right.(*num); ok {
+			if x != nil {
+				x.parent = e
+			}
 		}
 	}
 	return e
