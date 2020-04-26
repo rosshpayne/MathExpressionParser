@@ -20,7 +20,6 @@ func buildExprGraph(input string) *expression {
 		operandL    bool   // put next INT in numL
 		extendRight bool   // Used when a higher precedence operation detected. Assigns the latest expression to the right operand of the current expression.
 		negative    bool   // negative number detected
-		ihpSet      bool
 		opr         operator
 		e, en       *expression // "e" points to current expression in graph while "en" is the latest expression to be created and added to the graph using AddParent() or ExtendRight() functions.
 		lp          []depthT
@@ -81,8 +80,8 @@ func buildExprGraph(input string) *expression {
 
 				} else {
 
-					// numL has yet to be consumed in expr, this means we have an active * or / operator ie. ihpSet true
-					// "(" has interrupted current ihpSet operation, so must complete existing extendRight
+					// numL has yet to be consumed in expr, this means we have an active * or / operator
+					// "(" has interrupted current  operation, so must complete existing extendRight
 					fmt.Println("IN LPAREN: numL not nil make numL only expression ")
 					en = makeExpr(lvl-1, numL, opr, nil)
 
@@ -95,7 +94,6 @@ func buildExprGraph(input string) *expression {
 						e, lvl = e.ExtendRight(en, lvl)
 					}
 				}
-				ihpSet = false
 				operandL = true
 				extendRight = true
 				numL, numR = nil, nil
@@ -108,19 +106,14 @@ func buildExprGraph(input string) *expression {
 			// pop lvl from lp
 			lvl, lp = lp[len(lp)-1], lp[:len(lp)-1]
 			fmt.Println("in RPAREN: lvl  ", lvl)
-			if ihpSet {
-				lvl--
-				ihpSet = false
-				fmt.Println("in RPAREN:  ihpSet ", lvl)
-			}
+
 			t := p.CurToken
 			if t.Type == token.MULTIPLY || t.Type == token.DIVIDE {
-				ihpSet = true
+				//	delay impact of ")" until "+", "-""
 				lvl++
-				fmt.Println("in RPAREN:  set ihpSet ", lvl)
 			}
 
-			fmt.Println("in RPAREN: lvl--", lvl)
+			fmt.Println("in RPAREN: lvl ", lvl)
 
 		case token.INT:
 
@@ -176,7 +169,7 @@ func buildExprGraph(input string) *expression {
 					fmt.Println("HIGHER PRECEDENCE ....  ", i, lvl)
 					// all higher precedence operations, ihp or explicit (), perform an "extendRight" to create a separate path in the graph.
 					extendRight = true
-					ihpSet = true
+
 					// we are setup to create a new expression with left and right NUM operands and attach this node to the right of the existing node (expression)
 					// this will be carried out during this current parse of NUM and the next NUM.
 					operandL = true
@@ -212,7 +205,6 @@ func buildExprGraph(input string) *expression {
 						// AddParent is the default method to extend the graph, so make extendRight false. Must be explicitly set to true
 						// when the correct scenario occurs i.e. immediately after a ( or higher precedence operation detected
 						extendRight = false
-						//ihpSet = false //xxx
 					} else {
 						e = e.AddParent(en)
 					}
@@ -222,10 +214,6 @@ func buildExprGraph(input string) *expression {
 		case token.PLUS:
 
 			opr = PLUS
-			if ihpSet {
-				lvl--
-				ihpSet = false
-			}
 
 		case token.MINUS:
 			// is it a negative sign or a minus sign?
@@ -236,10 +224,6 @@ func buildExprGraph(input string) *expression {
 			} else {
 
 				opr = MINUS
-				if ihpSet {
-					lvl--
-					ihpSet = false
-				}
 			}
 
 		case token.MULTIPLY:

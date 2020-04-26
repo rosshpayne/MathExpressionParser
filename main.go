@@ -148,20 +148,19 @@ func (e *expression) getResult() float64 {
 func makeExpr(d depthT, l operand, op operator, r operand) *expression {
 
 	e := &expression{depth: d, left: l, opr: op, right: r}
-	fmt.Printf("MakeExpr depth  %d opr %c  %s \n", e.depth, op, e.printName())
+	fmt.Printf("MakeExpr depth  %d opr %c  %v %v %v %v\n", e.depth, op, e.left, e.right, l, r)
 
-	if l != nil {
-		if x, ok := e.left.(*num); ok {
-			if x != nil {
-				x.parent = e
-			}
+	// remember: nil interfaces means the type component is nil not necessarily the value component.
+	// if a nil numL is passed to makeExpr, the type component is set (operand) but the value (concrete type) is nil.
+	// so to check the interface is nil you must check the value is also nil, as below.
+	if x, ok := e.left.(*num); ok {
+		if x != nil {
+			x.parent = e
 		}
 	}
-	if r != nil {
-		if x, ok := e.right.(*num); ok {
-			if x != nil {
-				x.parent = e
-			}
+	if x, ok := e.right.(*num); ok {
+		if x != nil {
+			x.parent = e
 		}
 	}
 	return e
@@ -187,16 +186,14 @@ func (c *expression) AddParent(n *expression) *expression {
 	//
 	ediff := c.depth - n.depth
 	if ediff > 0 {
-		// move up to next hierarchy level, noting that the expression may have no parent.
-		// This occurs when the math statement starts with more than one (. The expression nodes at the root
-		//  may have a depth (precedence level) > 1 as a result.
+		// move to next paranthesis level, noting that the expression may have no parent.
 		if c.parent != nil {
 			fmt.Println("AddParent ===== lvl ", c.depth, n.depth)
 			return c.parent.AddParent(n)
 		}
 	}
 	//
-	// At the correct precedence level. Now add the new expression, n, as parent.
+	// At the correct paranthesis level. Now add the new expression, n, as parent.
 	//
 	if c.parent != nil {
 		// as with ExtendRight(), the parent of the current node, if it exists at this level,
