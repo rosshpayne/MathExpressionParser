@@ -163,10 +163,9 @@ func buildExprGraph(input string) *expression {
 
 					}
 					fmt.Println("HIGHER PRECEDENCE ....  ", i, lvl)
-					// all higher precedence operations, ihp or explicit (), perform an "extendRight" to create a separate path in the graph.
+					// all higher precedence operations or explicit (), perform an "extendRight" to create a new branch in the graph.
 					extendRight = true
-					// we are setup to create a new expression with left and right NUM operands and attach this node to the right of the existing node (expression)
-					// this will be carried out during this current parse of NUM and the next NUM.
+					// new branches begin with a left operand
 					operandL = true
 				}
 			}
@@ -174,14 +173,13 @@ func buildExprGraph(input string) *expression {
 			if operandL {
 
 				numL = &num{i: i}
-				fmt.Println("Left NUM", i, "  lvl: ", lvl)
 				operandL = false
+				fmt.Println("Left NUM", i, "  lvl: ", lvl)
 
 			} else {
 
 				numR = &num{i: i}
 				fmt.Println("Right NUM ", i, "  lvl: ", lvl)
-				//
 				en := makeExpr(lvl, numL, opr, numR)
 				if e == nil {
 					e, en = en, nil
