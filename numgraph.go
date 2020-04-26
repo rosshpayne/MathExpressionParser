@@ -36,6 +36,8 @@ func numGraph(input string) *expression {
 	p := parser.New(l)
 	operandL = true
 
+	// TODO - initial single parse to validate parenthesis match
+
 	for {
 
 		prevTok = tok
