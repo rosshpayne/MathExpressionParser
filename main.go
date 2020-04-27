@@ -145,10 +145,36 @@ func (e *expression) getResult() float64 {
 	return e.result
 }
 
+// integer
+type num struct {
+	parent *expression
+	i      int
+}
+
+func (n *num) getParent() *expression {
+	return n.parent
+}
+
+func (n *num) type_() string {
+	return "num"
+}
+
+func (n *num) getResult() float64 {
+	return float64(n.i)
+}
+
+func (n *num) printName() string {
+	if n == nil {
+		return "nil"
+	} else {
+		return fmt.Sprintf("%d", n.i)
+	}
+}
+
 func makeExpr(d depthT, l operand, op operator, r operand) (*expression, operator) {
 
 	e := &expression{depth: d, left: l, opr: op, right: r}
-	fmt.Printf("MakeExpr depth  %d opr %c  %v %v %v %v\n", e.depth, op, e.left, e.right, l, r)
+	fmt.Printf("MakeExpr depth  %d opr %c  %v %v\n", e.depth, op, e.left, e.right)
 
 	// remember: nil interfaces means the type component is nil not necessarily the value component.
 	// if a nil numL is passed to makeExpr, the type component is set (operand) but the value (concrete type) is nil.
@@ -237,83 +263,6 @@ func (f *function) printName() string {
 		return "nil"
 	}
 	return f.name
-}
-
-// num exists for testing purposes.
-type num struct {
-	parent *expression
-	i      int
-}
-
-func (n *num) getParent() *expression {
-	return n.parent
-}
-
-func (n *num) type_() string {
-	return "num"
-}
-
-func (n *num) getResult() float64 {
-	return float64(n.i)
-}
-
-func (n *num) printName() string {
-	if n == nil {
-		return "nil"
-	} else {
-		return fmt.Sprintf("%d", n.i)
-	}
-}
-
-type facetStmt struct {
-	// either name is populated in which case that facet value is displayed for each of the uids
-	// or a facet expression is defined and it is used to filter the uids to be processed/display.
-	name string
-	expr *expression
-}
-
-type attributeSet interface {
-	sc()
-}
-
-type scalarAttr struct {
-	variable string
-	alias    string
-	name     string
-	facets   []string
-}
-
-func (s scalarAttr) sc() {}
-
-type uidAttr struct {
-	variable   string
-	alias      string
-	name       string
-	filter     function
-	uid        uidS
-	facets     []*facetStmt    // facets to display for scalar attributes  and/or expressions for uid-predicate attributes
-	attributes []*attributeSet // applicable only to uid-predicates i.e. a node
-}
-
-func (s uidAttr) sc() {}
-
-// rootStmt - populated by parser, consumed by query engine to populate uids.
-type rootStmt struct {
-	variable string
-	name     string
-	qry      qryExpr // root query - uses GSI P_N, P_B, P_S returns [UID]
-	uids     uidS    // hold output of qry
-	//
-	facets []*facetStmt
-	filter qryExpr // filter applies to output of query, uids.
-	//directive  []directiveT
-	attributes []*attributeSet
-}
-
-type qryExpr struct {
-	func_ string
-	arg1  string
-	arg2  string
 }
 
 func main() {}
