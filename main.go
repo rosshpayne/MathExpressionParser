@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"strconv"
+
 	"github.com/satori/go.uuid"
 )
 
@@ -16,7 +18,7 @@ const (
 type funcT uint8
 
 const (
-	eq funcT = 1 << iota
+	eq funcT = iota
 	le
 	lt
 	gt
@@ -47,23 +49,6 @@ func (b *valBl) lit() {}
 
 type Function func(p predNameT, litVal string) uidS
 
-// {
-//   data(func: eq(name, "Alice")) {
-//     friend @facets(eq(close, true) AND eq(relative, true)) @facets(relative) { # filter close friends in my relation
-//       name
-//     }
-//   }
-// }
-// for each uid
-//.   execute filterExpr(uid)
-//		walk query tree
-//  		when it gets to func. fetch from dynamo, given uid and what facets are required
-//          run function with values from db. Get true/false. If true save uid in uids. If false ignore and go on to next.
-// for each uid in uids
-//       walk the parse tree
-//         and output data held in the tree from dynamo
-//
-
 type operator byte
 
 const (
@@ -72,8 +57,6 @@ const (
 	MULTIPLY operator = '*'
 	DIVIDE   operator = '/'
 )
-
-type depthT = int8
 
 func walk(e operand) {
 
@@ -113,7 +96,8 @@ func findRoot(e *expression) *expression {
 	return e
 }
 
-// operand interface. type num, expression satisfy.
+// operand interface.
+// So far type num (integer), expression satisfy, but this can of course be extended to floats, complex numbers, functions etc.
 type operand interface {
 	getParent() *expression
 	type_() string
@@ -122,12 +106,12 @@ type operand interface {
 }
 
 type expression struct { // expr1 and expr2     expr1 or expr2       exp1 or (expr2 and expr3). (expr1 or expr2) and expr3
-	depth  depthT   // precedence level. TODO: rename to something more suitable.
+	id     uint8    // type of expression. So far used only to identify the NULL expression, representing the "(" i.e the left parameter or LPARAM in a mathematical expression
 	name   string   // optionally give each expression a name. Maybe useful for debugging purposes.
-	result float64  // store result of "left.int operator right.int". Walking the graph will interrogate each operand (interface) for its result.
-	left   operand  // eq(close, true) , order  value comes from  uid in the set of uids belonging to the predicate.
+	result float64  // store result of "left operator right. Walking the graph will interrogate each operand for its result.
+	left   operand  //
 	opr    operator // for Boolean: AND OR NOT  For mathematical: +-/*
-	right  operand  // eq(relative, true)
+	right  operand  //
 	parent *expression
 }
 
@@ -171,10 +155,9 @@ func (n *num) printName() string {
 	}
 }
 
-func makeExpr(d depthT, l operand, op operator, r operand) (*expression, operator) {
+func makeExpr(l operand, op operator, r operand) (*expression, operator) {
 
-	e := &expression{depth: d, left: l, opr: op, right: r}
-	fmt.Printf("MakeExpr depth  %d opr %c  %v %v\n", e.depth, op, e.left, e.right)
+	e := &expression{left: l, opr: op, right: r}
 
 	// remember: nil interfaces means the type component is nil not necessarily the value component.
 	// if a nil numL is passed to makeExpr, the type component is set (operand) but the value (concrete type) is nil.
@@ -189,49 +172,70 @@ func makeExpr(d depthT, l operand, op operator, r operand) (*expression, operato
 			x.parent = e
 		}
 	}
+	if l != nil && r != nil {
+		if l_, ok := l.(*num); ok {
+			if r_, ok := r.(*num); ok {
+				ln := "nil "
+				if l_ != nil {
+					ln = strconv.Itoa(l_.i) + " "
+				}
+				rn := " nil"
+				if r_ != nil {
+					rn = " " + strconv.Itoa(r_.i)
+				}
+				e.name = "[ " + ln + string(op) + rn + "]"
+			}
+		}
+	} else if l == nil && r == nil {
+		e.name = "[" + "nil " + string(op) + " nil" + "]"
+	} else {
+		if l != nil {
+			if x, ok := l.(*num); ok {
+				v := "nil"
+				if x != nil {
+					v = strconv.Itoa(x.i) + " "
+				}
+				e.name = "[ " + v + string(op) + " nil" + "]"
+			}
+		}
+		if r != nil {
+			if x, ok := r.(*num); ok {
+				v := "nil"
+				if x != nil {
+					v = " " + strconv.Itoa(x.i)
+				}
+				e.name = "[ " + "nil " + string(op) + v + "]"
+			}
+		}
+	}
+	fmt.Printf("\n****   MakeExpr %s\n", e.name)
+
 	return e, 0
 }
 
 // ExtendRight for Higher Precedence operators or open braces - parsed:   *,/, (
 // c - current op node, n is the higer order op we want to extend right
-func (c *expression) extendRight(n *expression, lvl depthT) (*expression, depthT) {
+func (c *expression) extendRight(n *expression) *expression {
 
 	c.right = n
-	//n.depth = lvl + 1
-	n.depth = c.depth + 1
 	n.parent = c
-	fmt.Printf("ExtendRight......%c-%d  %c-%d\n", c.opr, c.depth, n.opr, n.depth)
-	return n, n.depth
+
+	fmt.Printf("++++++++++++++++++++++++++ extendRight  -  FROM %s  -> %s  \n", c.name, n.name)
+	return n
 }
 
-// addParent - add expression (argument), to expression (method receiver) as a parent, if it is at a suitable level in the precedence hierarchy.
-// Otherwise recursively walk the graph upwards until we get to an expression with the correct precedence level.
 func (c *expression) addParent(n *expression) *expression {
 	//
-	// based on depth (precedence level) of expression n and c, walk up the tree to find a suitable expression to append n to.
-	//
-	ediff := c.depth - n.depth
-	if ediff > 0 {
-		// move to next paranthesis level, noting that the expression may have no parent.
-		if c.parent != nil {
-			fmt.Println("addParent ===== lvl ", c.depth, n.depth)
-			return c.parent.addParent(n)
-		}
-	}
-	//
-	// At the correct paranthesis level. Now add the new expression, n, as parent.
-	//
 	if c.parent != nil {
-		// as with ExtendRight(), the parent of the current node, if it exists at this level,
-		//  must now point to the new node being added, and similar the new node must point back to the current node.
+		//  current node must now point to the new node being added, and similar the new node must point back to the current node.
 		c.parent.right = n
 		n.parent = c.parent
 	}
 	// set old parent to new node
 	c.parent = n
 	n.left = c
-	fmt.Printf("addParent.....new parent %c-%d on %c-%d\n", n.opr, n.depth, c.opr, c.depth)
 
+	fmt.Printf("\n++++++++++++++++++++++++++ addParent  %s on %s \n\n", n.name, c.name)
 	return n
 }
 

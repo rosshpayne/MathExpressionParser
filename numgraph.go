@@ -9,40 +9,44 @@ import (
 	"github.com/DynamoGraph/token"
 )
 
+const (
+	LPAREN uint8 = 1
+)
+
 func buildExprGraph(input string) *expression {
 
 	type state struct {
-		lvl depthT
-		md  bool // true for multiply or division ineffect.
+		opr operator
 	}
 
 	var (
-		tok          *token.Token
-		prevTok      *token.Token
-		lvl          depthT // precedence level. "(" increments level and adds to graph using extendRight() while ")" decrements level and uses addParent() to existing expression to extend the graph.
-		numL         *num   // number node on lhs of operator expression
-		numR         *num   // number node on rhs of operator expression
-		operandL     bool   // put next INT in numL
-		extendRight  bool   // Used when a higher precedence operation detected. Assigns the latest expression to the right operand of the current expression.
-		negative     bool   // negative number detected
-		cancelRPAREN bool
-		multidiv     bool
-		opr          operator
-		e, en        *expression // "e" points to current expression in graph while "en" is the latest expression to be created and added to the graph using addParent() or extendRight() functions.
-		lp           []state
+		tok         *token.Token
+		prevTok     *token.Token
+		numL        *num // number node on lhs of operator expression
+		numR        *num // number node on rhs of operator expression
+		operandL    bool // put next INT in numL
+		extendRight bool // Used when a higher precedence operation detected. Assigns the latest expression to the right operand of the current expression.
+		negative    bool // negative number detected
+		opr         operator
+		opr_        operator    // saved operator from state
+		e, en       *expression // "e" points to current expression in graph while "en" is the latest expression to be created and added to the graph using addParent() or extendRight() functions.
+		lp          []state
 	)
 
 	pushState := func() {
-		s := state{lvl: lvl, md: multidiv}
+		s := state{opr: opr}
 		lp = append(lp, s)
+		fmt.Printf("\n================================================== PUSH: len,opr_ %d %c \n", len(lp), s.opr)
 	}
 
 	popState := func() {
 		var s state
 		s, lp = lp[len(lp)-1], lp[:len(lp)-1]
-		lvl = s.lvl
-		multidiv = s.md
+		opr_ = s.opr
+		fmt.Printf("\n================================================== POP: len,opr_  %d %c \n", len(lp), s.opr)
+
 	}
+
 	// as the parser processes the input left to right it builds a tree (graph) by creating an expression as each operator is parsed and then immediately links
 	// it to the previous expression. If the expression is at the same precedence level it links the new expression as the parent of the current expression. In the case
 	// of higher precedence operations it links to the right of the current expression (func: extendRight). Walking the tree and evaluating each expression returns the final result.
@@ -52,7 +56,6 @@ func buildExprGraph(input string) *expression {
 	l := lexer.New(input)
 	p := parser.New(l)
 	operandL = true
-	multidiv = true
 
 	// TODO - initial full parse to validate left and right parenthesis match
 
@@ -67,22 +70,20 @@ func buildExprGraph(input string) *expression {
 		case token.EOF:
 			break
 		case token.LPAREN:
-
-			pushState()
-			lvl++
-
-			fmt.Printf("LPAREN.....lvl %d   opr  [%c]  numL= %v\n", lvl, opr, numL)
-			// look ahead
-			t := p.CurToken
-			if t.Type == token.LPAREN {
-				continue
-			}
+			//
+			// LPAREN is represented in the graph by a "NULL" expression (node) consisting of operator "+" and left operand of 1.
 			//
 			// 3*(3+4      (3+4
 			//  ^          ^
 			//  opr        opr is nil
 			// ^           ^
 			// numL        numL is nil
+			//
+			// save the current state as we will need it when the associated closing param is evaluated
+			//
+			pushState()
+			//
+			// add any expression that has not already been added to the graph
 			//
 			if opr != 0 {
 				// parser is not at the beginning of the stmt e.g (5*3+...
@@ -91,7 +92,7 @@ func buildExprGraph(input string) *expression {
 					fmt.Println("IN LPAREN: numL nil make operator only expression and append to current expression")
 					//  operands have been consumed into current expression. Take opr and make it parent of the expression.
 					//  The next operands and operator to be parsed will be extended to right of this operator only expression.
-					en, opr = makeExpr(lvl-1, nil, opr, nil)
+					en, opr = makeExpr(nil, opr, nil)
 					e = e.addParent(en)
 
 				} else {
@@ -99,44 +100,64 @@ func buildExprGraph(input string) *expression {
 					// numL has yet to be consumed in expr, this means we have an active * or / operator
 					// "(" has interrupted current  operation, so must complete existing extendRight
 					fmt.Println("IN LPAREN: numL not nil make numL only expression ")
-					en, opr = makeExpr(lvl-1, numL, opr, nil)
+					en, opr = makeExpr(numL, opr, nil)
 
 					if e == nil {
-						fmt.Println("IN LPAREN: set expr as first time ")
 						e, en = en, nil
 
 					} else {
-						fmt.Println("IN LPAREN: EXTEND RIGHT...on current expr ")
-						e, lvl = e.extendRight(en, lvl)
+						e = e.extendRight(en)
 					}
 				}
-				operandL = true
-				extendRight = true
-				numL, numR = nil, nil
-
 			}
+			//
+			// add a NULL expression representing the "("
+			//
+			en = &expression{left: &num{i: 0}, opr: '+', right: nil, name: "LPAREN", id: LPAREN}
+			if e == nil {
+				e, en = en, nil
+
+			} else {
+				e = e.extendRight(en)
+			}
+			operandL = true
+			extendRight = true
+			numL, numR = nil, nil
+			fmt.Println("END LPAREN: e.name : ", e.name)
 
 		case token.RPAREN:
 
+			fmt.Println("RPAREN  ")
+
 			popState()
 
-			fmt.Println("RPAREN  lvl ", lvl)
-			// peek and next token
-			t := p.CurToken
-			if (t.Type == token.MULTIPLY || t.Type == token.DIVIDE) && !multidiv {
-				//	delay impact of RPAREN until next RPAREN. Any "+", "-" will be added to this level which is OK
-				//  as these operations do not impact the precedence. Any "*","/" will
-				//  extend-right as usual and increase the level as a result. (see extendRight)
-				lvl++
-				cancelRPAREN = true
+			// navigate up to next LPARAM expression (node)
+			for e = e.parent; e.id != LPAREN; {
+				if e.parent == nil {
+					break
+				}
+				e = e.parent
 			}
-			fmt.Println("RPAREN  lvl ", lvl)
+			//
+			if e.parent != nil {
+				if e.parent.id != LPAREN {
+					// opr_ represents the operator that existed at the associated "(". Sourced from state.
+					if opr_ == '/' || opr_ == '*' || opr_ == 0 {
+						fmt.Println("opr_ is adjusting to e.parent ", opr_)
+						e = e.parent
+					}
+				}
+			}
+			if e.parent != nil {
+				fmt.Println("+finalis e.name, parent : ", e.name, e.parent.name)
+			} else {
+				fmt.Println("final e.name , parent: ", e.name, "nil")
+			}
 
 		case token.INT:
 
 			i, err := strconv.Atoi(tok.Literal)
 			if err != nil {
-				//l.Err = fmt.Errorf("Failed to convert to int, %w", err)
 				break
 			}
 			if negative {
@@ -151,38 +172,38 @@ func buildExprGraph(input string) *expression {
 			// ^            ^             ^
 			// numL        numL          numR (numL nil)
 			//
-			fmt.Printf("********* in INT %d : opr = [%c]. lvl = %d\n", i, opr, lvl)
+			fmt.Printf("********* in INT %d : opr = [%c]\n", i, opr)
 			if opr == '+' || opr == '-' {
 				//
 				tok := p.CurToken // which is really a peekToken because we do a NextToken after setting tok in top of for loop
 				if tok.Type == token.MULTIPLY || tok.Type == token.DIVIDE {
+					//	hp = true
 					//
 					// High precedence operaton - create node (expression) and attach to graph in preparation for future extendRight node(s).
 					//
 					if extendRight {
-						en, opr = makeExpr(lvl, numL, opr, nil)
+						en, opr = makeExpr(numL, opr, nil)
 						if e == nil {
 							e, en = en, nil
 						} else {
-							e, lvl = e.extendRight(en, lvl)
+							e = e.extendRight(en)
 							extendRight = false
 						}
 
 					} else if numL == nil {
 						// add operator only node to graph - no left, right operands. addParent will attach left, and future ExtendRIght will attach right.
-						en, opr = makeExpr(lvl, nil, opr, nil)
+						en, opr = makeExpr(nil, opr, nil)
 						e = e.addParent(en)
 
 					} else {
 						// make expr for existing numL and opr
-						en, opr = makeExpr(lvl, numL, opr, nil)
+						en, opr = makeExpr(numL, opr, nil)
 						if e == nil {
 							e, en = en, nil
 						} else {
 							e = e.addParent(en)
 						}
 					}
-					fmt.Println("HIGHER PRECEDENCE ....  ", i, lvl)
 					// all higher precedence operations or explicit (), perform an "extendRight" to create a new branch in the graph.
 					extendRight = true
 					// new branches begin with a left operand
@@ -194,13 +215,13 @@ func buildExprGraph(input string) *expression {
 
 				numL = &num{i: i}
 				operandL = false
-				fmt.Println("Left NUM", i, "  lvl: ", lvl)
+				fmt.Println("Left NUM ", i)
 
 			} else {
 
 				numR = &num{i: i}
-				fmt.Println("Right NUM ", i, "  lvl: ", lvl)
-				en, opr = makeExpr(lvl, numL, opr, numR)
+				fmt.Println("Right NUM ", i)
+				en, opr = makeExpr(numL, opr, numR)
 				if e == nil {
 					e, en = en, nil
 				}
@@ -211,9 +232,8 @@ func buildExprGraph(input string) *expression {
 				// do not extend or add expression until we have an "e" and "en" expression.
 				if en != nil {
 					if extendRight {
-						fmt.Printf("**** extendRight on  %c lvl %d     child: %c  %s lvl. %d \n\n", e.opr, e.depth, en.opr, en.name, en.depth)
-						// higher precedence operator or a ( has occured - create new branch to right of current expression
-						e, lvl = e.extendRight(en, lvl)
+						fmt.Printf("**** extendRight on  %c    child: %c  %s \n\n", e.opr, en.opr, en.name)
+						e = e.extendRight(en)
 						// addParent is the default method to extend the graph, so make extendRight false. Must be explicitly set to true
 						// when the correct scenario occurs i.e. immediately after a ( or higher precedence operation detected
 						extendRight = false
@@ -226,11 +246,6 @@ func buildExprGraph(input string) *expression {
 		case token.PLUS:
 
 			opr = PLUS
-			if cancelRPAREN {
-				lvl--
-				cancelRPAREN = false
-			}
-			multidiv = false
 
 		case token.MINUS:
 			// is it a negative sign or a minus sign?
@@ -239,22 +254,16 @@ func buildExprGraph(input string) *expression {
 				negative = true
 			} else {
 				opr = MINUS
-				if cancelRPAREN {
-					lvl--
-					cancelRPAREN = false
-				}
 			}
-			multidiv = false
 
 		case token.MULTIPLY:
 
 			opr = MULTIPLY
-			multidiv = true
 
 		case token.DIVIDE:
 
 			opr = DIVIDE
-			multidiv = true
+
 		}
 		if tok.Type == token.EOF {
 			break
