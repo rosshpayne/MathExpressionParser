@@ -131,21 +131,15 @@ func buildExprGraph(input string) *expression {
 
 			popState()
 
-			// navigate up to next LPARAM expression (node)
-			for e = e.parent; e.id != LPAREN; {
-				if e.parent == nil {
-					break
-				}
-				e = e.parent
+			// navigate current expression e, up to next LPARAM expression
+			for e = e.parent; e.parent != nil && e.id != LPAREN; e = e.parent {
 			}
 			//
-			if e.parent != nil {
-				if e.parent.id != LPAREN {
-					// opr_ represents the operator that existed at the associated "(". Sourced from state.
-					if opr_ == '/' || opr_ == '*' || opr_ == 0 {
-						fmt.Println("opr_ is adjusting to e.parent ", opr_)
-						e = e.parent
-					}
+			if e.parent != nil && e.parent.id != LPAREN {
+				// opr_ represents the operator that existed at the associated "(". Sourced from state.
+				if opr_ == '/' || opr_ == '*' || opr_ == 0 {
+					fmt.Println("opr_ is adjusting to e.parent ", opr_)
+					e = e.parent
 				}
 			}
 			if e.parent != nil {
